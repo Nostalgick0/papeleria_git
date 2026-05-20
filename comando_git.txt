@@ -1,0 +1,71 @@
+Comandos de git:
+* git init → Inicializa Git en la carpeta actual.
+* git status → Muestra el estado del proyecto y archivos modificados.
+* git add . → Agrega todos los archivos al área de preparación.
+* git add archivo.txt → Agrega un archivo específico.
+* git commit -m "mensaje" → Guarda los cambios con un mensaje.
+* git log → Muestra el historial completo de commits.
+* git log --oneline → Muestra el historial resumido.
+* git clone URL → Descarga un repositorio desde GitHub.
+* git push → Sube cambios a GitHub.
+* git pull → Descarga y actualiza cambios desde GitHub.
+* git remote add origin URL → Conecta el proyecto local con GitHub.
+* git remote -v → Muestra las URLs remotas conectadas.
+* git branch → Muestra las ramas existentes.
+* git branch nombreRama → Crea una nueva rama.
+* git checkout nombreRama → Cambia a otra rama.
+* git checkout -b nombreRama → Crea y cambia a una nueva rama.
+* git merge nombreRama → Fusiona una rama con la actual.
+* git branch -d nombreRama → Elimina una rama.
+* git diff → Muestra diferencias entre cambios realizados.
+* git restore archivo.txt → Descarta cambios no guardados.
+* git restore --staged archivo.txt → Quita un archivo del área staging.
+* git branch -M main → Cambia el nombre de la rama actual a main.
+* git push -u origin main → Sube la rama main por primera vez.
+* git config --global user.name "Tu Nombre" → Configura tu nombre en Git.
+* git config --global user.email "correo@gmail.com" → Configura tu correo en Git.
+* git config --list → Muestra toda la configuración actual de Git.
+* cd carpeta → Entra a una carpeta desde la terminal.
+* mkdir nombreCarpeta → Crea una carpeta nueva.
+* touch archivo.txt → Crea un archivo vacío (Mac/Linux).
+* ls → Muestra los archivos de la carpeta actual (Mac/Linux).
+* clear → Limpia la terminal.
+* pwd → Muestra la ruta de la carpeta actual.
+* rm archivo.txt → Elimina un archivo (Mac/Linux).
+* rm -rf carpeta → Elimina una carpeta completa (Mac/Linux).
+* code . → Abre la carpeta actual en Visual Studio Code.
+* git fetch → Descarga cambios remotos sin aplicarlos.
+* git stash → Guarda cambios temporales sin hacer commit.
+* git stash pop → Recupera cambios guardados temporalmente.
+* git reset --hard → Revierte cambios completamente.
+* git rm archivo.txt → Elimina un archivo y registra el cambio en Git.
+* git mv viejo.txt nuevo.txt → Renombra archivos usando Git.
+* git show → Muestra detalles de un commit.
+* git tag nombre → Crea una etiqueta o versión.
+* git rebase main → Reorganiza commits sobre otra rama.
+* git cherry-pick ID_COMMIT → Copia un commit específico a otra rama.
+* git reflog → Muestra historial interno de movimientos y cambios.
+* git clean -f → Elimina archivos no rastreados.
+* git commit --amend → Modifica el último commit.
+* git push --force → Fuerza subida de cambios (usar con cuidado).
+* git pull origin main → Descarga cambios específicamente de main.
+* git push origin main → Sube cambios específicamente a main.
+* git checkout main → Cambia a la rama principal.
+* git blame archivo.txt → Muestra quién modificó cada línea.
+* git shortlog → Resume commits por autor.
+* git archive → Genera un archivo comprimido del proyecto.
+* git help comando → Muestra ayuda de un comando específico.
+
+
+Cuando quiera subir cambios a mi rama:
+Git status
+Git checkout enrique
+Git add .
+Git commit -m “”
+Git push origin Enrique
+
+Cuando quiera que los cambios de mi rama pasen al main:
+git checkout main
+git pull origin main
+git merge enrique
+git push origin main
