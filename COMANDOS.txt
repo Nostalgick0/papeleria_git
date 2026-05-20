@@ -67,5 +67,5 @@ Git push origin cesar
 Cuando quiera que los cambios de mi rama pasen al main:
 git checkout main
 git pull origin main
-git merge enrique
+git merge cesar
 git push origin main
