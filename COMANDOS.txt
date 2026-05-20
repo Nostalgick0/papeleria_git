@@ -69,3 +69,7 @@ git checkout main
 git pull origin main
 git merge cesar
 git push origin main
+
+Primera vez usando git 
+	•	git config --global user.name "Tu Nombre" → Configura tu nombre en Git.
+	•	git config --global user.email "correo@gmail.com" → Configura tu correo en Git.
