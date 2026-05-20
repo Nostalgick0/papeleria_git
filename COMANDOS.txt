@@ -67,14 +67,11 @@ Git push origin cesar
 Cuando quiera que los cambios de mi rama pasen al main:
 git checkout main
 git pull origin main
-<<<<<<< HEAD
 git merge cesar
 git push origin main
 
 Primera vez usando git 
 	•	git config --global user.name "Tu Nombre" → Configura tu nombre en Git.
 	•	git config --global user.email "correo@gmail.com" → Configura tu correo en Git.
-=======
-git merge enrique
-git push origin main
->>>>>>> c251bc4fdda67ab712e115863f7fd2393a0ef399
+
+
