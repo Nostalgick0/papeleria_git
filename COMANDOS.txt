@@ -69,3 +69,7 @@ git checkout main
 git pull origin main
 git merge cesar
 git push origin main
+
+
+
+JUGANDO UN RATO CON GIT 
