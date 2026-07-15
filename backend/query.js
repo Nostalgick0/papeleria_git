@@ -54,6 +54,15 @@ async function getUnidades() {
     return rows;
 }
 
+async function insertUnidad(nombre_unidad) {
+    const [rows] = await db.query(
+        'INSERT INTO unidades (nombre_unidad, estatus) \
+        VALUES (?, 1)', [nombre_unidad]
+    );
+    return rows;
+
+}
+
 //---------------------------------------------------------------------------------------------------
 
 //°---------------------------------°
@@ -129,7 +138,7 @@ async function getProveedores() {
 //°---------------------------------°
 
 async function getProductos() {
-    const [rows] = await db.query('SELECT pk_producto, fk_categoria, fk_unidad, precio_venta, costo_compra, stock, stock_minimo, estatus FROM productos');
+    const [rows] = await db.query('SELECT pk_producto, nombre_producto, fk_categoria, fk_unidad, precio_venta, costo_compra, stock, stock_minimo, estatus FROM productos');
 
     return rows;
 }
@@ -177,10 +186,136 @@ async function getMetodos() {
 //°---------------------------------°
 
 async function getVentas() {
-    const [rows] = await db.query('SELECT pk_venta, fecha_venta, total_venta, fk_metodo_pago, estatus FROM ventas');
+    const [rows] = await db.query(
+        'SELECT v.pk_venta, v.fecha_venta, v.total_venta, v.fk_metodo_pago, v.estatus, m.nombre_metodo_pago \
+        FROM ventas v \
+        JOIN metodos_pago m ON v.fk_metodo_pago = m.pk_metodo_pago'
+    );
 
     return rows;
 }
+
+async function insertVenta(fecha_venta, total_venta, fk_metodo_pago, items, servicios) {
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [ventaResult] = await connection.query(
+            'INSERT INTO ventas (fecha_venta, total_venta, fk_metodo_pago, estatus) VALUES (?, ?, ?, 1)',
+            [fecha_venta, total_venta, fk_metodo_pago]
+        );
+        const pk_venta = ventaResult.insertId;
+
+        for (const item of items) {
+            await connection.query(
+                'INSERT INTO detalle_venta (fk_venta, fk_producto, precio_unidad_prod, cantidad_unidad, subtotal, estatus) \
+                VALUES (?, ?, ?, ?, ?, 1)',
+                [pk_venta, item.fk_producto, item.precio_unidad_prod, item.cantidad_unidad, item.subtotal]
+            );
+            //se descuenta el stock del producto vendido
+            await connection.query(
+                'UPDATE productos SET stock = stock - ? WHERE pk_producto = ?',
+                [item.cantidad_unidad, item.fk_producto]
+            );
+        }
+
+        for (const servicio of servicios) {
+            await connection.query(
+                'INSERT INTO detalle_venta (fk_venta, fk_servicio, cantidad_servicio, precio_unidad_serv, subtotal, estatus) \
+                VALUES (?, ?, ?, ?, ?, 1)',
+                [pk_venta, servicio.fk_servicio, servicio.cantidad_servicio, servicio.precio_unidad_serv, servicio.subtotal]
+            );
+        }
+
+        //si todo salió bien, se aplican los cambios de forma definitiva
+        await connection.commit();
+        return { pk_venta };
+    } catch (error) {
+        //si algo falla, se deshace todo lo que se alcanzó a hacer en esta transacción
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
+async function actualizarVenta(pk_venta, fecha_venta, total_venta, fk_metodo_pago, items, servicios) {
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        //se restaura el stock de los productos que tenía la venta antes de modificarla
+        const [detalleAnterior] = await connection.query(
+            'SELECT fk_producto, cantidad_unidad FROM detalle_venta WHERE fk_venta = ? AND fk_producto IS NOT NULL',
+            [pk_venta]
+        );
+        for (const d of detalleAnterior) {
+            await connection.query(
+                'UPDATE productos SET stock = stock + ? WHERE pk_producto = ?',
+                [d.cantidad_unidad, d.fk_producto]
+            );
+        }
+
+        //se elimina el detalle anterior para reemplazarlo por el nuevo
+        await connection.query('DELETE FROM detalle_venta WHERE fk_venta = ?', [pk_venta]);
+
+        await connection.query(
+            'UPDATE ventas SET fecha_venta = ?, total_venta = ?, fk_metodo_pago = ? WHERE pk_venta = ?',
+            [fecha_venta, total_venta, fk_metodo_pago, pk_venta]
+        );
+
+        for (const item of items) {
+            await connection.query(
+                'INSERT INTO detalle_venta (fk_venta, fk_producto, precio_unidad_prod, cantidad_unidad, subtotal, estatus) \
+                VALUES (?, ?, ?, ?, ?, 1)',
+                [pk_venta, item.fk_producto, item.precio_unidad_prod, item.cantidad_unidad, item.subtotal]
+            );
+            await connection.query(
+                'UPDATE productos SET stock = stock - ? WHERE pk_producto = ?',
+                [item.cantidad_unidad, item.fk_producto]
+            );
+        }
+
+        for (const servicio of servicios) {
+            await connection.query(
+                'INSERT INTO detalle_venta (fk_venta, fk_servicio, cantidad_servicio, precio_unidad_serv, subtotal, estatus) \
+                VALUES (?, ?, ?, ?, ?, 1)',
+                [pk_venta, servicio.fk_servicio, servicio.cantidad_servicio, servicio.precio_unidad_serv, servicio.subtotal]
+            );
+        }
+
+        //si todo salió bien, se aplican los cambios de forma definitiva
+        await connection.commit();
+    } catch (error) {
+        //si algo falla, se deshace todo (incluyendo el DELETE), así no se pierde el detalle
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
+async function deshabilitarVenta(pk_venta) {
+    //se restaura el stock de los productos de esta venta antes de deshabilitarla
+    const [detalle] = await db.query(
+        'SELECT fk_producto, cantidad_unidad FROM detalle_venta WHERE fk_venta = ? AND fk_producto IS NOT NULL',
+        [pk_venta]
+    );
+    for (const d of detalle) {
+        await db.query(
+            'UPDATE productos SET stock = stock + ? WHERE pk_producto = ?',
+            [d.cantidad_unidad, d.fk_producto]
+        );
+    }
+
+    const [rows] = await db.query(
+        'UPDATE ventas SET estatus = 0 WHERE pk_venta = ?',
+        [pk_venta]
+    );
+
+    return rows;
+}
+
 
 //---------------------------------------------------------------------------------------------------
 
@@ -192,8 +327,18 @@ async function getVentas() {
 //|                                 |
 //°---------------------------------°
 
-async function getDetalle() {
-    const [rows] = await db.query('SELECT pk_detalle_com, fk_venta, fk_producto, precio_unidad_prod, cantidad_unidad, fk_servicio, cantidad_servicio, precio_unidad_serv, subtotal, estatus FROM detalle_venta');
+async function getDetalle(fk_venta) {
+    const [rows] = await db.query(
+        'SELECT d.pk_detalle_com, d.fk_venta, \
+                d.fk_producto, p.nombre_producto, d.precio_unidad_prod, d.cantidad_unidad, \
+                d.fk_servicio, s.nombre_servicio, d.cantidad_servicio, d.precio_unidad_serv, \
+                d.subtotal, d.estatus \
+        FROM detalle_venta d \
+        LEFT JOIN productos p ON d.fk_producto = p.pk_producto \
+        LEFT JOIN servicios s ON d.fk_servicio = s.pk_servicio \
+        WHERE d.fk_venta = ?',
+        [fk_venta]
+    );
 
     return rows;
 }
@@ -203,6 +348,8 @@ async function getDetalle() {
 //exportamos las funciones para poder utilizarlas
 module.exports = {
     login,
+    actualizarVenta,
+    deshabilitarVenta,
     getCategorias,
     getDetalle,
     getEmpresas,
@@ -213,4 +360,6 @@ module.exports = {
     getServicios,
     getUnidades,
     getVentas,
+    insertUnidad,
+    insertVenta
 };

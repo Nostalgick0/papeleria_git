@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Card,
   Table,
@@ -9,6 +9,7 @@ import {
   Popconfirm,
   Tooltip,
   Grid,
+  message,
 } from "antd"
 import {
   PlusOutlined,
@@ -16,21 +17,59 @@ import {
   EditOutlined,
   StopOutlined,
 } from "@ant-design/icons"
-import { useData } from "../context/DataContext"
-import { formatCurrency, formatFecha } from "../utils/helpers"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 import VentaForm from "../components/VentaForm"
 import VentaDetalle from "../components/VentaDetalle"
 
 const { Title } = Typography
 const { useBreakpoint } = Grid
 
+//formatea un número como moneda en pesos mexicanos
+function formatCurrency(valor) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(valor)
+}
+
+//formatea una fecha a formato legible dd/mm/aaaa
+function formatFecha(fecha) {
+  return new Date(fecha).toLocaleDateString("es-MX")
+}
+
 export default function Ventas() {
-  const { ventas, deshabilitarVenta } = useData()
+  const [ventas, setVentas] = useState([])
   const [formOpen, setFormOpen] = useState(false)
   const [detalleOpen, setDetalleOpen] = useState(false)
   const [ventaEditar, setVentaEditar] = useState(null)
   const [ventaDetalle, setVentaDetalle] = useState(null)
   const screens = useBreakpoint()
+
+  useEffect(() => {
+    cargarVentas()
+  }, [])
+
+  //trae las ventas desde el backend
+  const cargarVentas = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/obtenerVentas`)
+      setVentas(response.data)
+    } catch (error) {
+      message.error("Error al cargar las ventas")
+    }
+  }
+
+  //deshabilita una venta en el backend y refresca la tabla
+  const deshabilitarVenta = async (id) => {
+    try {
+      await axios.post(`${BACKEND_URL}/deshabilitarVenta`, { id })
+      message.success("Venta deshabilitada correctamente")
+      cargarVentas()
+    } catch (error) {
+      message.error("Error al deshabilitar la venta")
+    }
+  }
 
   function nuevaVenta() {
     setVentaEditar(null)
@@ -50,33 +89,35 @@ export default function Ventas() {
   const columnas = [
     {
       title: "Fecha",
-      dataIndex: "fecha",
-      key: "fecha",
+      dataIndex: "fecha_venta",
+      key: "fecha_venta",
       render: (f) => formatFecha(f),
-      sorter: (a, b) => new Date(b.fecha) - new Date(a.fecha),
+      sorter: (a, b) => new Date(b.fecha_venta) - new Date(a.fecha_venta),
       defaultSortOrder: "ascend",
     },
     {
       title: "Total",
-      dataIndex: "total",
-      key: "total",
+      dataIndex: "total_venta",
+      key: "total_venta",
       align: "right",
       render: (v) => <strong>{formatCurrency(v)}</strong>,
-      sorter: (a, b) => a.total - b.total,
+      sorter: (a, b) => a.total_venta - b.total_venta,
     },
     {
       title: "Método de pago",
-      dataIndex: "metodoPago",
-      key: "metodoPago",
+      dataIndex: "nombre_metodo_pago",
+      key: "nombre_metodo_pago",
       responsive: ["sm"],
       render: (m) => <Tag color={m === "Efectivo" ? "green" : "blue"}>{m}</Tag>,
     },
     {
       title: "Estado",
-      dataIndex: "estado",
-      key: "estado",
+      dataIndex: "estatus",
+      key: "estatus",
       render: (e) => (
-        <Tag color={e === "Activa" ? "success" : "default"}>{e}</Tag>
+        <Tag color={e === 1 ? "success" : "default"}>
+          {e === 1 ? "Activa" : "Deshabilitada"}
+        </Tag>
       ),
     },
     {
@@ -97,7 +138,7 @@ export default function Ventas() {
             <Button
               size="small"
               icon={<EditOutlined />}
-              disabled={record.estado === "Deshabilitada"}
+              disabled={record.estatus !== 1}
               onClick={() => editar(record)}
             />
           </Tooltip>
@@ -107,15 +148,15 @@ export default function Ventas() {
             okText="Sí, deshabilitar"
             cancelText="Cancelar"
             okButtonProps={{ danger: true }}
-            disabled={record.estado === "Deshabilitada"}
-            onConfirm={() => deshabilitarVenta(record.id)}
+            disabled={record.estatus !== 1}
+            onConfirm={() => deshabilitarVenta(record.pk_venta)}
           >
             <Tooltip title="Deshabilitar">
               <Button
                 size="small"
                 danger
                 icon={<StopOutlined />}
-                disabled={record.estado === "Deshabilitada"}
+                disabled={record.estatus !== 1}
               />
             </Tooltip>
           </Popconfirm>
@@ -148,7 +189,7 @@ export default function Ventas() {
         <Table
           columns={columnas}
           dataSource={ventas}
-          rowKey="id"
+          rowKey="pk_venta"
           scroll={{ x: 700 }}
           pagination={{ pageSize: 10, showSizeChanger: false }}
         />
@@ -158,6 +199,7 @@ export default function Ventas() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         ventaEditar={ventaEditar}
+        onGuardado={cargarVentas}
       />
       <VentaDetalle
         open={detalleOpen}
