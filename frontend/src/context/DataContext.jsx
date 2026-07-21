@@ -6,6 +6,7 @@ import {
   categoriasIniciales,
   subcategoriasIniciales,
   proveedoresIniciales,
+  empresasIniciales,
 } from "../data/mockData"
 import { generarId, unidadesBaseEntrada } from "../utils/helpers"
 
@@ -24,7 +25,15 @@ function cargarEstadoInicial() {
         entradas: parsed.entradas || entradasIniciales,
         categorias: parsed.categorias || categoriasIniciales,
         subcategorias: parsed.subcategorias || subcategoriasIniciales,
-        proveedores: parsed.proveedores || proveedoresIniciales,
+        proveedores: (parsed.proveedores || proveedoresIniciales).map((prov) => ({
+          id: prov.id,
+          nombre: prov.nombre || "",
+          empresa: prov.empresa || "",
+          RFC: prov.RFC || "",
+          telefono: prov.telefono || "",
+          correo: prov.correo || "",
+          estado: prov.estado || "Activo",
+        })),
       }
     }
   } catch (e) {
@@ -37,6 +46,7 @@ function cargarEstadoInicial() {
     categorias: categoriasIniciales,
     subcategorias: subcategoriasIniciales,
     proveedores: proveedoresIniciales,
+    empresas: empresasIniciales,
   }
 }
 
@@ -126,6 +136,19 @@ export function DataProvider({ children }) {
       prev.map((p) => (p.id === id ? { ...p, estado } : p)),
     )
     return { ok: true }
+  }
+
+  function agregarEmpresa(nombre) {
+    if (!nombre) return null
+    const existe = empresas.some(
+      (empresa) => empresa.toLowerCase() === nombre.toLowerCase(),
+    )
+    if (existe) return nombre
+
+    const nueva = nombre.trim()
+    if (!nueva) return null
+    setEmpresas((prev) => [...prev, nueva])
+    return nueva
   }
 
   // ============ CATEGORÍAS ============
@@ -256,6 +279,8 @@ export function DataProvider({ children }) {
     const unidadesBase = unidadesBaseEntrada(prod, datos.cantidad)
     const nueva = {
       ...datos,
+      // normalizar proveedor para compatibilidad con el listado
+      proveedor: datos.proveedorNombre || datos.proveedorId || datos.proveedor || "",
       unidadesBase,
       id: generarId("e"),
       fecha: new Date().toISOString(),
@@ -289,7 +314,15 @@ export function DataProvider({ children }) {
 
     setEntradas((prev) =>
       prev.map((e) =>
-        e.id === id ? { ...e, ...nuevosDatos, unidadesBase: unidadesBaseNueva } : e,
+        e.id === id
+          ? {
+              ...e,
+              ...nuevosDatos,
+              unidadesBase: unidadesBaseNueva,
+              proveedor:
+                nuevosDatos.proveedorNombre || nuevosDatos.proveedorId || nuevosDatos.proveedor || "",
+            }
+          : e,
       ),
     )
   }

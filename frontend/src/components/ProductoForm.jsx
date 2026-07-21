@@ -1,17 +1,38 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Modal, Form, Input, InputNumber, Select, Row, Col, App } from "antd"
 import { useData } from "../context/DataContext"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 
 export default function ProductoForm({ open, onClose, productoEditar }) {
-  const { categorias, agregarProducto, editarProducto, agregarCategoria } =
-    useData()
+  const { agregarProducto, editarProducto } = useData()
   const { message } = App.useApp()
   const [form] = Form.useForm()
+  const [categoriasOptions, setCategoriasOptions] = useState([])
+  const [loadingCategorias, setLoadingCategorias] = useState(false)
 
   const editando = !!productoEditar
 
   useEffect(() => {
+    async function fetchCategorias() {
+      setLoadingCategorias(true)
+      try {
+        const res = await axios.get(`${BACKEND_URL}/obtenerCategorias`)
+        setCategoriasOptions(
+          (res.data || [])
+            .filter((c) => c.estatus === 1)
+            .map((c) => ({ value: c.nombre_categoria, label: c.nombre_categoria }))
+        )
+      } catch (error) {
+        console.error("Error cargando categorías:", error)
+        setCategoriasOptions([])
+      } finally {
+        setLoadingCategorias(false)
+      }
+    }
+
     if (open) {
+      fetchCategorias()
       if (productoEditar) {
         form.setFieldsValue({ ...productoEditar })
       } else {
@@ -22,11 +43,6 @@ export default function ProductoForm({ open, onClose, productoEditar }) {
   }, [open, productoEditar, form])
 
   function onFinish(valores) {
-    // Si la categoría es nueva, registrarla
-    if (valores.categoria && !categorias.includes(valores.categoria)) {
-      agregarCategoria(valores.categoria)
-    }
-
     const datos = {
       nombre: valores.nombre,
       categoria: valores.categoria,
@@ -68,14 +84,17 @@ export default function ProductoForm({ open, onClose, productoEditar }) {
         <Form.Item
           name="categoria"
           label="Categoría"
-          rules={[{ required: true, message: "Selecciona o escribe una categoría" }]}
+          rules={[{ required: true, message: "Selecciona una categoría" }]}
         >
           <Select
             showSearch
-            mode="tags"
-            maxCount={1}
-            placeholder="Selecciona o escribe una nueva"
-            options={categorias.map((c) => ({ value: c, label: c }))}
+            placeholder="Selecciona una categoría registrada"
+            loading={loadingCategorias}
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label || "").toLowerCase().includes(input.toLowerCase())
+            }
+            options={categoriasOptions}
           />
         </Form.Item>
 

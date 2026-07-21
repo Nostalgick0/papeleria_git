@@ -4,18 +4,19 @@ import {
   Select,
   Button,
   InputNumber,
-  Radio,
   Table,
   Typography,
   Divider,
   Space,
   Empty,
   App,
+  Form,
 } from "antd"
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons"
 import { useData } from "../context/DataContext"
 import { formatCurrency } from "../utils/helpers"
-import { serviciosDisponibles } from "../data/mockData"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 
 const { Title, Text } = Typography
 
@@ -25,9 +26,13 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
 
   const [items, setItems] = useState([])
   const [servicios, setServicios] = useState([])
-  const [metodoPago, setMetodoPago] = useState("Efectivo")
+  const [metodoPago, setMetodoPago] = useState("")
   const [productoSel, setProductoSel] = useState(null)
   const [servicioSel, setServicioSel] = useState(null)
+  const [serviciosOptions, setServiciosOptions] = useState([])
+  const [loadingServicios, setLoadingServicios] = useState(false)
+  const [metodosOptions, setMetodosOptions] = useState([])
+  const [loadingMetodos, setLoadingMetodos] = useState(false)
 
   const editando = !!ventaEditar
 
@@ -41,7 +46,7 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
       } else {
         setItems([])
         setServicios([])
-        setMetodoPago("Efectivo")
+        setMetodoPago("")
       }
       setProductoSel(null)
       setServicioSel(null)
@@ -134,6 +139,53 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
     const totalServicios = servicios.reduce((acc, s) => acc + s.subtotal, 0)
     return totalItems + totalServicios
   }, [items, servicios])
+
+  useEffect(() => {
+    async function fetchServicios() {
+      setLoadingServicios(true)
+      try {
+        const res = await axios.get(`${BACKEND_URL}/obtenerServicios`)
+        setServiciosOptions(
+          (res.data || [])
+            .filter((s) => s.estatus === 1)
+            .map((s) => ({
+              value: s.nombre_servicio,
+              label: s.nombre_servicio,
+            })),
+        )
+      } catch (error) {
+        console.error("Error cargando servicios:", error)
+        setServiciosOptions([])
+      } finally {
+        setLoadingServicios(false)
+      }
+    }
+
+    async function fetchMetodos() {
+      setLoadingMetodos(true)
+      try {
+        const res = await axios.get(`${BACKEND_URL}/obtenerMetodos`)
+        setMetodosOptions(
+          (res.data || [])
+            .filter((m) => m.estatus === 1)
+            .map((m) => ({
+              value: m.nombre_metodo_pago,
+              label: m.nombre_metodo_pago,
+            })),
+        )
+      } catch (error) {
+        console.error("Error cargando métodos de pago:", error)
+        setMetodosOptions([])
+      } finally {
+        setLoadingMetodos(false)
+      }
+    }
+
+    if (open) {
+      fetchServicios()
+      fetchMetodos()
+    }
+  }, [open])
 
   // Validación: alguna cantidad supera el stock disponible
   const itemsConError = items.filter(
@@ -340,11 +392,17 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
       <Title level={5}>Servicios adicionales</Title>
       <Space.Compact style={{ width: "100%", marginBottom: 12 }}>
         <Select
-          placeholder="Selecciona un servicio..."
+          showSearch
+          placeholder="Buscar servicio registrado..."
           value={servicioSel}
           onChange={setServicioSel}
           style={{ width: "100%" }}
-          options={serviciosDisponibles.map((s) => ({ value: s, label: s }))}
+          loading={loadingServicios}
+          optionFilterProp="label"
+          filterOption={(input, option) =>
+            (option?.label || "").toLowerCase().includes(input.toLowerCase())
+          }
+          options={serviciosOptions}
         />
         <Button type="primary" icon={<PlusOutlined />} onClick={agregarServicio}>
           Agregar
@@ -367,15 +425,23 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
       <Divider />
 
       <Title level={5}>Método de pago</Title>
-      <Radio.Group
-        value={metodoPago}
-        onChange={(e) => setMetodoPago(e.target.value)}
-        optionType="button"
-        buttonStyle="solid"
+      <Form.Item
+        label="Método de pago"
+        style={{ marginBottom: 0 }}
       >
-        <Radio.Button value="Efectivo">Efectivo</Radio.Button>
-        <Radio.Button value="Transferencia">Transferencia</Radio.Button>
-      </Radio.Group>
+        <Select
+          showSearch
+          placeholder="Selecciona un método de pago"
+          value={metodoPago}
+          onChange={setMetodoPago}
+          loading={loadingMetodos}
+          optionFilterProp="label"
+          filterOption={(input, option) =>
+            (option?.label || "").toLowerCase().includes(input.toLowerCase())
+          }
+          options={metodosOptions}
+        />
+      </Form.Item>
     </Drawer>
   )
 }

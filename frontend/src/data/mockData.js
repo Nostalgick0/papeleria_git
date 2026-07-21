@@ -44,6 +44,8 @@ export const subcategoriasIniciales = [
   { id: "s7", nombre: "Útiles escolares", categoriaId: "c4", estado: "Activo" },
 ]
 
+export const empresasIniciales = []
+
 // ============ PRODUCTOS ============
 // tipoProducto: "simple" | "fraccionable"
 // El stock siempre se guarda en unidadBase como número entero.

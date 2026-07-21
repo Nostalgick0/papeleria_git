@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Card,
   Table,
@@ -24,12 +24,16 @@ import {
 import { useData } from "../context/DataContext"
 import { formatCurrency } from "../utils/helpers"
 import ProductoForm from "../components/ProductoForm"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 
 const { Title, Text } = Typography
 const { useBreakpoint } = Grid
 
 export default function Inventario() {
-  const { productos, categorias, cambiarEstadoProducto } = useData()
+  const { productos, cambiarEstadoProducto } = useData()
+  const [categoriasOptions, setCategoriasOptions] = useState([])
+  const [loadingCategorias, setLoadingCategorias] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [productoEditar, setProductoEditar] = useState(null)
   const [busqueda, setBusqueda] = useState("")
@@ -45,6 +49,27 @@ export default function Inventario() {
     setProductoEditar(producto)
     setFormOpen(true)
   }
+
+  useEffect(() => {
+    async function fetchCategorias() {
+      setLoadingCategorias(true)
+      try {
+        const res = await axios.get(`${BACKEND_URL}/obtenerCategorias`)
+        setCategoriasOptions(
+          (res.data || [])
+            .filter((c) => c.estatus === 1)
+            .map((c) => ({ value: c.nombre_categoria, label: c.nombre_categoria })),
+        )
+      } catch (error) {
+        console.error("Error cargando categorías:", error)
+        setCategoriasOptions([])
+      } finally {
+        setLoadingCategorias(false)
+      }
+    }
+
+    fetchCategorias()
+  }, [])
 
   const productosFiltrados = useMemo(() => {
     return productos.filter((p) => {
@@ -202,7 +227,8 @@ export default function Inventario() {
               style={{ width: "100%" }}
               value={filtroCategoria}
               onChange={setFiltroCategoria}
-              options={categorias.map((c) => ({ value: c, label: c }))}
+              loading={loadingCategorias}
+              options={categoriasOptions}
             />
           </Col>
         </Row>
