@@ -4,7 +4,6 @@ Archivos modificados
 Cambios en la configuración local de la base de datos.
 
 index.js
-Se agregaron rutas y lógica de backend nueva/más clara.
 Se incluyeron rutas de creación/actualización de proveedores.
 
 query.js
