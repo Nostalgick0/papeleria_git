@@ -141,50 +141,26 @@ async function getOrCreateEmpresa(nombre) {
     return id
 }
 
-async function setProveedorEmpresas(pk_proveedor, empresaNombres = []) {
-    await db.query('DELETE FROM proveedor_empresas WHERE fk_proveedor = ?', [pk_proveedor])
-    if (!Array.isArray(empresaNombres) || empresaNombres.length === 0) {
-        return
-    }
-
-    const empresaIds = []
-    for (const nombre of empresaNombres) {
-        if (!nombre || !nombre.trim()) continue
-        const fk_empresa = await getOrCreateEmpresa(nombre.trim())
-        if (fk_empresa) empresaIds.push(fk_empresa)
-    }
-
-    if (empresaIds.length > 0) {
-        const values = empresaIds.map((fk_empresa) => [pk_proveedor, fk_empresa])
-        await db.query(
-            'INSERT INTO proveedor_empresas (fk_proveedor, fk_empresa) VALUES ?',
-            [values],
-        )
-    }
-}
-
 // ----------------- Proveedores -----------------
 async function insertProveedor({ nombre_proveedor, empresas, RFC, telefono, correo, estatus = 1 }) {
-    const firstEmpresa = Array.isArray(empresas) && empresas.length > 0 ? empresas[0] : empresas
-    const fk_empresa = await getOrCreateEmpresa(firstEmpresa)
+    const priEmpresa = Array.isArray(empresas) && empresas.length > 0 ? empresas[0] : empresas
+    const fk_empresa = await getOrCreateEmpresa(priEmpresa)
     const [result] = await db.query(
         'INSERT INTO proveedores (nombre_proveedor, fk_empresa, RFC, telefono, correo, estatus) VALUES (?, ?, ?, ?, ?, ?)',
         [nombre_proveedor, fk_empresa || 1, RFC, telefono, correo, estatus]
     )
 
-    await setProveedorEmpresas(result.insertId, empresas)
     return { insertId: result.insertId }
 }
 
 async function updateProveedor(pk_proveedor, { nombre_proveedor, empresas, RFC, telefono, correo, estatus = 1 }) {
-    const firstEmpresa = Array.isArray(empresas) && empresas.length > 0 ? empresas[0] : empresas
-    const fk_empresa = await getOrCreateEmpresa(firstEmpresa)
+    const priEmpresa = Array.isArray(empresas) && empresas.length > 0 ? empresas[0] : empresas
+    const fk_empresa = await getOrCreateEmpresa(priEmpresa)
     await db.query(
         'UPDATE proveedores SET nombre_proveedor = ?, fk_empresa = ?, RFC = ?, telefono = ?, correo = ?, estatus = ? WHERE pk_proveedor = ?',
         [nombre_proveedor, fk_empresa || 1, RFC, telefono, correo, estatus, pk_proveedor]
     )
 
-    await setProveedorEmpresas(pk_proveedor, empresas)
     return { ok: true }
 }
 

@@ -156,10 +156,10 @@ export default function Proveedores() {
               />
             </Tooltip>
 
-            <Tooltip title={esInactivo ? "Proveedor inactivado" : "Inactivar"}>
+            <Tooltip title={esInactivo ? "Proveedor deshabilitado" : "Deshabilitar"}>
               <Popconfirm
-                title="¿Inactivar este proveedor?"
-                okText="Sí, inactivar"
+                title="Deshabilitar este proveedor?"
+                okText="Aceptar"
                 cancelText="Cancelar"
                 onConfirm={() => inactivarProveedor(record)}
                 disabled={esInactivo} // Evita que se abra la confirmación si ya está inactivo
@@ -198,15 +198,7 @@ export default function Proveedores() {
         </Button>
       </div>
 
-      <Card style={{ marginBottom: 16 }}>
-        <Input.Search
-          placeholder="Buscar proveedor por nombre, empresa, RFC o correo"
-          allowClear
-          enterButton
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-      </Card>
+     
 
       <Card>
         <Table

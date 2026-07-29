@@ -37,7 +37,6 @@ const sections = [
   {
     key: "categorias",
     title: "Categorías",
-    subtitle: "Define el catálogo de categorías para los productos",
     listEndpoint: "obtenerCategorias",
     endpoint: "categorias",
     icon: <FolderOutlined />,
@@ -49,7 +48,6 @@ const sections = [
   {
     key: "unidades",
     title: "Unidades de venta",
-    subtitle: "Agrega las unidades disponibles para los productos",
     listEndpoint: "obtenerUnidades",
     endpoint: "unidades",
     icon: <ToolOutlined />,
@@ -61,7 +59,6 @@ const sections = [
   {
     key: "servicios",
     title: "Servicios adicionales",
-    subtitle: "Configura los servicios que el negocio puede vender",
     listEndpoint: "obtenerServicios",
     endpoint: "servicios",
     icon: <PrinterOutlined />,
@@ -73,7 +70,6 @@ const sections = [
   {
     key: "metodos",
     title: "Métodos de pago",
-    subtitle: "Define los medios de pago aceptados",
     listEndpoint: "obtenerMetodos",
     endpoint: "metodos",
     icon: <CreditCardOutlined />,
@@ -85,7 +81,6 @@ const sections = [
   {
     key: "empresas",
     title: "Empresas de proveedores",
-    subtitle: "Registra las empresas proveedoras asociadas",
     listEndpoint: "obtenerEmpresas",
     endpoint: "empresas",
     icon: <HomeOutlined />,
@@ -271,14 +266,14 @@ function Catalogos() {
           <Popconfirm
             title={
               record.estado === "Activo"
-                ? `¿Inactivar esta ${sectionMeta?.singular}?`
+                ? `¿Deshabilitar esta ${sectionMeta?.singular}?`
                 : `¿Activar esta ${sectionMeta?.singular}?`
             }
             okText="Sí"
             cancelText="Cancelar"
             onConfirm={() => handleToggleEstado(record)}
           >
-            <Tooltip title={record.estado === "Activo" ? "Inactivar" : "Activar"}>
+            <Tooltip title={record.estado === "Activo" ? "Deshabilitar" : "Activar"}>
               <Button
                 size="small"
                 danger={record.estado === "Activo"}
@@ -341,7 +336,7 @@ function Catalogos() {
         </Row>
       ) : (
         <>
-          <Card style={{ marginBottom: 16 }}>
+          
             <div
               style={{
                 display: "flex",
@@ -349,31 +344,20 @@ function Catalogos() {
                 justifyContent: "space-between",
                 gap: 16,
                 alignItems: "center",
+                marginBottom: 16
               }}
             >
               <div>
-                <Title level={4} style={{ marginBottom: 8 }}>
-                  {sectionMeta.title}
-                </Title>
-                <Text type="secondary">{sectionMeta.subtitle}</Text>
               </div>
 
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
-                Nuevo {sectionMeta.singular}
+                Agregar {sectionMeta.singular}
               </Button>
             </div>
-          </Card>
+          
 
           <Card>
-            <div style={{ marginBottom: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Input.Search
-                placeholder={`Buscar ${sectionMeta.title.toLowerCase()}`}
-                allowClear
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                style={{ minWidth: 260, flex: 1 }}
-              />
-            </div>
+            
 
             {loading ? (
               <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
