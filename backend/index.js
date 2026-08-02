@@ -39,6 +39,18 @@ app.post('/login', async (req, res) => {
 //°---------------------------------°
 //|                                 |  
 //|                                 |  
+//|            DASHBOARD            |
+//|                                 | 
+//|                                 |
+//°---------------------------------°
+
+
+
+//---------------------------------------------------------------------------------------------------
+
+//°---------------------------------°
+//|                                 |  
+//|                                 |  
 //|            UNIDADES             |
 //|                                 | 
 //|                                 |
@@ -239,6 +251,16 @@ app.post('/actualizarVenta', async (req, res) => {
     } catch (error) {
         console.error(error); //temporal, para ver el error real
         res.status(500).json({ error: 'Error al actualizar la venta' });
+    }
+});
+
+app.post('/deshabilitarVenta', async (req, res) => {
+    try {
+        const { id } = req.body;
+        await query.deshabilitarVenta(id);
+        res.json({ mensaje: 'Venta deshabilitada correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al deshabilitar la venta' });
     }
 });
 

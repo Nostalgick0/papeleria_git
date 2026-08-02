@@ -195,60 +195,6 @@ export function DataProvider({ children }) {
     return { ok: true }
   }
 
-  // ============ VENTAS ============
-  // El stock se descuenta usando item.unidadesBase (siempre en unidad base).
-  function agregarVenta(datos) {
-    const nueva = {
-      ...datos,
-      id: generarId("v"),
-      fecha: new Date().toISOString(),
-      estado: "Activa",
-    }
-    datos.items.forEach((item) => {
-      ajustarStock(item.productoId, -(item.unidadesBase ?? item.cantidad))
-    })
-    setVentas((prev) => [nueva, ...prev])
-    return nueva
-  }
-
-  function editarVenta(id, nuevosDatos) {
-    const ventaAnterior = ventas.find((v) => v.id === id)
-    if (!ventaAnterior) return
-
-    if (ventaAnterior.estado === "Activa") {
-      const anterior = {}
-      ventaAnterior.items.forEach((it) => {
-        anterior[it.productoId] =
-          (anterior[it.productoId] || 0) + (it.unidadesBase ?? it.cantidad)
-      })
-      const nuevo = {}
-      nuevosDatos.items.forEach((it) => {
-        nuevo[it.productoId] =
-          (nuevo[it.productoId] || 0) + (it.unidadesBase ?? it.cantidad)
-      })
-      const ids = new Set([...Object.keys(anterior), ...Object.keys(nuevo)])
-      ids.forEach((pid) => {
-        const diff = (anterior[pid] || 0) - (nuevo[pid] || 0)
-        if (diff !== 0) ajustarStock(pid, diff)
-      })
-    }
-
-    setVentas((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, ...nuevosDatos } : v)),
-    )
-  }
-
-  function deshabilitarVenta(id) {
-    const venta = ventas.find((v) => v.id === id)
-    if (!venta || venta.estado === "Deshabilitada") return
-    venta.items.forEach((item) => {
-      ajustarStock(item.productoId, item.unidadesBase ?? item.cantidad)
-    })
-    setVentas((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, estado: "Deshabilitada" } : v)),
-    )
-  }
-
   // ============ ENTRADAS DE MERCANCÍA ============
   // Las entradas para fraccionables se reciben en paquetes; al stock se suma en unidad base.
   function agregarEntrada(datos) {
@@ -327,9 +273,6 @@ export function DataProvider({ children }) {
     editarSubcategoria,
     cambiarEstadoSubcategoria,
     // ventas
-    agregarVenta,
-    editarVenta,
-    deshabilitarVenta,
     // entradas
     agregarEntrada,
     editarEntrada,

@@ -43,6 +43,16 @@ async function login(nombre_usuario, password) {
 //°---------------------------------°
 //|                                 |  
 //|                                 |  
+//|            DASHBAORD            |
+//|                                 | 
+//|                                 |
+//°---------------------------------°
+
+//---------------------------------------------------------------------------------------------------
+
+//°---------------------------------°
+//|                                 |  
+//|                                 |  
 //|            UNIDADES             |
 //|                                 | 
 //|                                 |
@@ -296,24 +306,37 @@ async function actualizarVenta(pk_venta, fecha_venta, total_venta, fk_metodo_pag
 }
 
 async function deshabilitarVenta(pk_venta) {
-    //se restaura el stock de los productos de esta venta antes de deshabilitarla
-    const [detalle] = await db.query(
-        'SELECT fk_producto, cantidad_unidad FROM detalle_venta WHERE fk_venta = ? AND fk_producto IS NOT NULL',
-        [pk_venta]
-    );
-    for (const d of detalle) {
-        await db.query(
-            'UPDATE productos SET stock = stock + ? WHERE pk_producto = ?',
-            [d.cantidad_unidad, d.fk_producto]
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        //se restaura el stock de los productos de esta venta antes de deshabilitarla
+        const [detalle] = await connection.query(
+            'SELECT fk_producto, cantidad_unidad FROM detalle_venta WHERE fk_venta = ? AND fk_producto IS NOT NULL',
+            [pk_venta]
         );
+        for (const d of detalle) {
+            await connection.query(
+                'UPDATE productos SET stock = stock + ? WHERE pk_producto = ?',
+                [d.cantidad_unidad, d.fk_producto]
+            );
+        }
+
+        const [rows] = await connection.query(
+            'UPDATE ventas SET estatus = 0 WHERE pk_venta = ?',
+            [pk_venta]
+        );
+
+        //si todo salió bien, se aplican los cambios de forma definitiva
+        await connection.commit();
+        return rows;
+    } catch (error) {
+        //si algo falla, se deshace todo (el stock no se toca)
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
-
-    const [rows] = await db.query(
-        'UPDATE ventas SET estatus = 0 WHERE pk_venta = ?',
-        [pk_venta]
-    );
-
-    return rows;
 }
 
 
