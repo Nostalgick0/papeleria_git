@@ -10,6 +10,24 @@ const app = express();
 
 const PORT = 5002;
 
+function normalizeDateTime(value) {
+    if (!value) {
+        return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+        return value;
+    }
+
+    const fecha = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(fecha.getTime())) {
+        return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    const pad = (numero) => String(numero).padStart(2, '0');
+    return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())} ${pad(fecha.getHours())}:${pad(fecha.getMinutes())}:${pad(fecha.getSeconds())}`;
+}
+
 app.use(cors());
 
 app.use(express.json());
@@ -76,6 +94,35 @@ app.get('/obtenerUnidades', async (req, res) => {
         res.json(unidades);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener las unidades' });
+    }
+});
+
+app.post('/insertarProducto', async (req, res) => {
+    try {
+        const producto = await query.insertarProducto(req.body);
+        res.json({ mensaje: 'Producto insertado correctamente', producto });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al insertar el producto' });
+    }
+});
+
+app.post('/actualizarProducto', async (req, res) => {
+    try {
+        const { pk_producto, ...datos } = req.body;
+        await query.actualizarProducto(pk_producto, datos);
+        res.json({ mensaje: 'Producto actualizado correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el producto' });
+    }
+});
+
+app.post('/cambiarEstadoProducto', async (req, res) => {
+    try {
+        const { pk_producto, estatus } = req.body;
+        await query.cambiarEstadoProducto(pk_producto, estatus);
+        res.json({ mensaje: 'Estado del producto actualizado correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el estado del producto' });
     }
 });
 
@@ -410,6 +457,57 @@ app.get('/obtenerEntradas', async (req, res) => {
     }
 });
 
+app.post('/entradas', async (req, res) => {
+    try {
+        const { productoId, cantidad, costoUnitario, proveedorId, fecha, total, estado } = req.body;
+        const result = await query.insertEntrada({
+            fecha_compra: normalizeDateTime(fecha),
+            total: total ?? Number(cantidad || 0) * Number(costoUnitario || 0),
+            fk_producto: productoId,
+            cantidad,
+            costo_unitario_compra: costoUnitario,
+            fk_proveedor: proveedorId || null,
+            estatus: estado === 'Activo' || estado === 'Activa' || estado === 1 ? 1 : 0,
+        });
+        res.json({ ok: true, id: result.insertId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al registrar la entrada' });
+    }
+});
+
+app.put('/entradas/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { productoId, cantidad, costoUnitario, proveedorId, fecha, total, estado } = req.body;
+        await query.updateEntrada(id, {
+            fecha_compra: normalizeDateTime(fecha),
+            total: total ?? Number(cantidad || 0) * Number(costoUnitario || 0),
+            fk_producto: productoId,
+            cantidad,
+            costo_unitario_compra: costoUnitario,
+            fk_proveedor: proveedorId || null,
+            estatus: estado === 'Activo' || estado === 'Activa' || estado === 1 ? 1 : 0,
+        });
+        res.json({ ok: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al actualizar la entrada' });
+    }
+});
+
+app.patch('/entradas/:id/estado', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { estado } = req.body;
+        await query.cambiarEstadoEntrada(id, estado === 'Activo' || estado === 'Activa' || estado === 1 ? 1 : 0);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al cambiar el estado de la entrada' });
+    }
+});
+
 //---------------------------------------------------------------------------------------------------
 
 //°---------------------------------°
@@ -445,6 +543,57 @@ app.get('/obtenerVentas', async (req, res) => {
         res.json(ventas);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener las ventas' });
+    }
+});
+
+app.post('/ventas', async (req, res) => {
+    try {
+        const { items = [], servicios = [], metodoPago, total, fecha, estado } = req.body;
+        const fkMetodoPago = req.body.fk_metodo_pago ?? metodoPago ?? null;
+        const result = await query.insertVenta({
+            fecha_venta: normalizeDateTime(fecha),
+            total_venta: total ?? 0,
+            fk_metodo_pago: fkMetodoPago,
+            estatus: estado === 'Activa' || estado === 'Activo' || estado === 1 ? 1 : 0,
+            items,
+            servicios,
+        });
+        res.json({ ok: true, id: result.insertId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al registrar la venta' });
+    }
+});
+
+app.put('/ventas/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { items = [], servicios = [], metodoPago, total, fecha, estado } = req.body;
+        const fkMetodoPago = req.body.fk_metodo_pago ?? metodoPago ?? null;
+        await query.updateVenta(id, {
+            fecha_venta: normalizeDateTime(fecha),
+            total_venta: total ?? 0,
+            fk_metodo_pago: fkMetodoPago,
+            estatus: estado === 'Activa' || estado === 'Activo' || estado === 1 ? 1 : 0,
+            items,
+            servicios,
+        });
+        res.json({ ok: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al actualizar la venta' });
+    }
+});
+
+app.patch('/ventas/:id/estado', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { estado } = req.body;
+        await query.cambiarEstadoVenta(id, estado === 'Activa' || estado === 'Activo' || estado === 1 ? 1 : 0);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al cambiar el estado de la venta' });
     }
 });
 

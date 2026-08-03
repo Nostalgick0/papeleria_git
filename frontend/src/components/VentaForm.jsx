@@ -33,6 +33,7 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
   const [loadingServicios, setLoadingServicios] = useState(false)
   const [metodosOptions, setMetodosOptions] = useState([])
   const [loadingMetodos, setLoadingMetodos] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const editando = !!ventaEditar
 
@@ -40,9 +41,11 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
   useEffect(() => {
     if (open) {
       if (ventaEditar) {
-        setItems(ventaEditar.items.map((i) => ({ ...i })))
-        setServicios((ventaEditar.servicios || []).map((s) => ({ ...s })))
-        setMetodoPago(ventaEditar.metodoPago)
+        const itemsIniciales = (ventaEditar.items || []).map((i) => ({ ...i }))
+        const serviciosIniciales = (ventaEditar.servicios || []).map((s) => ({ ...s }))
+        setItems(itemsIniciales)
+        setServicios(serviciosIniciales)
+        setMetodoPago(ventaEditar.metodoPago || "")
       } else {
         setItems([])
         setServicios([])
@@ -61,11 +64,11 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
   const stockEfectivo = useMemo(() => {
     const mapa = {}
     productos.forEach((p) => {
-      mapa[p.id] = p.stockActual
+      mapa[p.id] = Number(p.stockActual ?? 0)
     })
-    if (editando && ventaEditar.estado === "Activa") {
-      ventaEditar.items.forEach((it) => {
-        mapa[it.productoId] = (mapa[it.productoId] || 0) + it.cantidad
+    if (editando && ventaEditar?.estado === "Activa") {
+      ;(ventaEditar.items || []).forEach((it) => {
+        mapa[it.productoId] = (Number(mapa[it.productoId] || 0) + Number(it.cantidad || 0))
       })
     }
     return mapa
@@ -108,13 +111,35 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
 
   function agregarServicio() {
     if (!servicioSel) return
-    if (servicios.some((s) => s.nombre === servicioSel)) {
+
+    const servicioSeleccionado = serviciosOptions.find(
+      (op) => String(op.value) === String(servicioSel),
+    )
+
+    if (!servicioSeleccionado) return
+
+    const yaAgregado = servicios.some(
+      (s) =>
+        String(s.servicioId ?? s.nombre) === String(servicioSeleccionado.servicioId ?? servicioSeleccionado.value) ||
+        s.nombre === servicioSeleccionado.label,
+    )
+
+    if (yaAgregado) {
       message.warning("Ese servicio ya fue agregado.")
       return
     }
+
+    const precioServicio = Number(servicioSeleccionado.precioUnitario ?? 0)
+
     setServicios((prev) => [
       ...prev,
-      { nombre: servicioSel, cantidad: 1, precioUnitario: 0, subtotal: 0 },
+      {
+        servicioId: servicioSeleccionado.servicioId ? String(servicioSeleccionado.servicioId) : null,
+        nombre: servicioSeleccionado.label,
+        cantidad: 1,
+        precioUnitario: precioServicio,
+        subtotal: precioServicio,
+      },
     ])
     setServicioSel(null)
   }
@@ -149,8 +174,10 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
           (res.data || [])
             .filter((s) => s.estatus === 1)
             .map((s) => ({
-              value: s.nombre_servicio,
-              label: s.nombre_servicio,
+              value: String(s.pk_servicio ?? s.id ?? s.nombre_servicio ?? ""),
+              label: s.nombre_servicio ?? s.nombre ?? "",
+              servicioId: s.pk_servicio ?? s.id ?? null,
+              precioUnitario: Number(s.precio_servicio ?? s.precio ?? 0),
             })),
         )
       } catch (error) {
@@ -193,7 +220,7 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
   )
   const hayError = itemsConError.length > 0
 
-  function guardar() {
+  async function guardar() {
     if (items.length === 0 && servicios.length === 0) {
       message.error("Agrega al menos un producto o servicio.")
       return
@@ -202,21 +229,31 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
       message.error("Hay productos cuya cantidad supera el stock disponible.")
       return
     }
-    const datos = {
-      items: items.map((i) => ({ ...i })),
-      servicios: servicios.map((s) => ({ ...s })),
-      metodoPago,
-      total,
-    }
 
-    if (editando) {
-      editarVenta(ventaEditar.id, datos)
-      message.success("Venta actualizada correctamente.")
-    } else {
-      agregarVenta(datos)
-      message.success("Venta registrada correctamente.")
+    setSubmitting(true)
+    try {
+      const datos = {
+        items: items.map((i) => ({ ...i })),
+        servicios: servicios.map((s) => ({ ...s })),
+        metodoPago: metodoPago || "",
+        total: Number(total || 0),
+        estado: ventaEditar?.estado || "Activa",
+      }
+
+      if (editando) {
+        await editarVenta(ventaEditar.id, datos)
+        message.success("Venta actualizada correctamente.")
+      } else {
+        await agregarVenta(datos)
+        message.success("Venta registrada correctamente.")
+      }
+      onClose()
+    } catch (error) {
+      console.error("Error al guardar venta:", error)
+      message.error("No se pudo guardar la venta. Intenta nuevamente.")
+    } finally {
+      setSubmitting(false)
     }
-    onClose()
   }
 
   const columnasItems = [
@@ -348,7 +385,7 @@ export default function VentaForm({ open, onClose, ventaEditar }) {
           </Title>
           <Space>
             <Button onClick={onClose}>Cancelar</Button>
-            <Button type="primary" onClick={guardar} disabled={hayError}>
+            <Button type="primary" onClick={guardar} disabled={hayError || submitting} loading={submitting}>
               {editando ? "Guardar cambios" : "Registrar venta"}
             </Button>
           </Space>

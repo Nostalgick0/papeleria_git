@@ -263,24 +263,22 @@ function Catalogos() {
               }}
             />
           </Tooltip>
-          <Popconfirm
-            title={
-              record.estado === "Activo"
-                ? `¿Deshabilitar esta ${sectionMeta?.singular}?`
-                : `¿Activar esta ${sectionMeta?.singular}?`
-            }
-            okText="Sí"
-            cancelText="Cancelar"
-            onConfirm={() => handleToggleEstado(record)}
-          >
-            <Tooltip title={record.estado === "Activo" ? "Deshabilitar" : "Activar"}>
-              <Button
-                size="small"
-                danger={record.estado === "Activo"}
-                icon={<StopOutlined />}
-              />
+          {record.estado === "Activo" ? (
+            <Popconfirm
+              title={`¿Deshabilitar esta ${sectionMeta?.singular}?`}
+              okText="Sí"
+              cancelText="Cancelar"
+              onConfirm={() => handleToggleEstado(record)}
+            >
+              <Tooltip title="Deshabilitar">
+                <Button size="small" danger icon={<StopOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          ) : (
+            <Tooltip title="Inactivo">
+              <Button size="small" icon={<StopOutlined />} disabled />
             </Tooltip>
-          </Popconfirm>
+          )}
         </Space>
       ),
     },
