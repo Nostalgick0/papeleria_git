@@ -157,6 +157,16 @@ app.get('/obtenerProveedores', async (req, res) => {
     }
 });
 
+app.post('/cambiarEstadoProveedor', async (req, res) => {
+    try {
+        const { pk_proveedor, estatus } = req.body;
+        await query.cambiarEstadoProveedor(pk_proveedor, estatus);
+        res.json({ mensaje: 'Estado del proveedor actualizado correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el estado del proveedor' });
+    }
+});
+
 //---------------------------------------------------------------------------------------------------
 
 //°---------------------------------°
@@ -176,6 +186,16 @@ app.get('/obtenerProductos', async (req, res) => {
     }
 });
 
+app.post('/cambiarEstadoProducto', async (req, res) => {
+    try {
+        const { pk_producto, estatus } = req.body;
+        await query.cambiarEstadoProducto(pk_producto, estatus);
+        res.json({ mensaje: 'Estado del producto actualizado correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el estado del producto' });
+    }
+});
+
 //---------------------------------------------------------------------------------------------------
 
 //°---------------------------------°
@@ -192,6 +212,16 @@ app.get('/obtenerEntradas', async (req, res) => {
         res.json(entradas);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener las entradas de producto' });
+    }
+});
+
+app.post('/deshabilitarEntrada', async (req, res) => {
+    try {
+        const { id } = req.body;
+        await query.deshabilitarEntrada(id);
+        res.json({ mensaje: 'Entrada deshabilitada correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al deshabilitar la entrada' });
     }
 });
 
@@ -282,6 +312,15 @@ app.get('/obtenerDetalleVenta/:pk_venta', async (req, res) => {
         res.json(detalle);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener el detalle de la venta' });
+    }
+});
+
+app.get('/obtenerTodoDetalle', async (req, res) => {
+    try {
+        const detalle = await query.getTodoDetalle();
+        res.json(detalle);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener el detalle de las ventas' });
     }
 });
 

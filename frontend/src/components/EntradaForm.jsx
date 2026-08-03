@@ -1,7 +1,8 @@
-import { useEffect } from "react"
-import { Modal, Form, Select, InputNumber, Input, App } from "antd"
+import { useEffect, useState } from "react"
+import { Modal, Form, Select, InputNumber, Input, App, Spin } from "antd"
 import { useData } from "../context/DataContext"
 import { formatCurrency } from "../utils/helpers"
+import axios from "axios"
 
 export default function EntradaForm({ open, onClose, entradaEditar }) {
   const { productos, agregarEntrada, editarEntrada } = useData()
@@ -10,6 +11,9 @@ export default function EntradaForm({ open, onClose, entradaEditar }) {
 
   const editando = !!entradaEditar
 
+  const [proveedoresOptions, setProveedoresOptions] = useState([])
+  const [loadingProveedores, setLoadingProveedores] = useState(false)
+
   useEffect(() => {
     if (open) {
       if (entradaEditar) {
@@ -17,13 +21,36 @@ export default function EntradaForm({ open, onClose, entradaEditar }) {
           productoId: entradaEditar.productoId,
           cantidad: entradaEditar.cantidad,
           costoUnitario: entradaEditar.costoUnitario,
-          proveedor: entradaEditar.proveedor,
+          // mantener compatibilidad: si existe proveedorId usarlo, si no usar proveedor
+          proveedorId: entradaEditar.proveedorId || entradaEditar.proveedor,
         })
       } else {
         form.resetFields()
       }
+      // cargar proveedores cada vez que se abre el modal
+      fetchProveedores()
     }
   }, [open, entradaEditar, form])
+
+  async function fetchProveedores() {
+    setLoadingProveedores(true)
+    try {
+      const res = await axios.get("http://localhost:5002/obtenerProveedores")
+      const opts = (res.data || [])
+        .filter((p) => p.estatus === 1)
+        .map((p) => ({
+          value: String(p.pk_proveedor),
+          label: `${p.nombre_proveedor} ${p.empresa ? `(${p.empresa})` : ""}`,
+          raw: p,
+        }))
+      setProveedoresOptions(opts)
+    } catch (e) {
+      console.error("Error cargando proveedores:", e)
+      setProveedoresOptions([])
+    } finally {
+      setLoadingProveedores(false)
+    }
+  }
 
   const productosActivos = productos.filter((p) => p.estado === "Activo")
 
@@ -34,7 +61,10 @@ export default function EntradaForm({ open, onClose, entradaEditar }) {
       nombreProducto: prod ? prod.nombre : "",
       cantidad: valores.cantidad,
       costoUnitario: valores.costoUnitario,
-      proveedor: valores.proveedor || "",
+      proveedorId: valores.proveedorId || "",
+      proveedorNombre:
+        (proveedoresOptions.find((o) => o.value === String(valores.proveedorId)) ||
+          {}).label || "",
     }
 
     if (editando) {
@@ -97,8 +127,21 @@ export default function EntradaForm({ open, onClose, entradaEditar }) {
           />
         </Form.Item>
 
-        <Form.Item name="proveedor" label="Proveedor">
-          <Input placeholder="Nombre del proveedor" />
+        <Form.Item name="proveedorId" label="Proveedor">
+          {loadingProveedores ? (
+            <Spin />
+          ) : (
+            <Select
+              showSearch
+              placeholder="Buscar proveedor..."
+              optionFilterProp="label"
+              allowClear
+              options={proveedoresOptions}
+              filterOption={(input, option) =>
+                (option?.label || "").toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          )}
         </Form.Item>
       </Form>
     </Modal>

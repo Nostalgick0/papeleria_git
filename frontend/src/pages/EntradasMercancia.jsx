@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Card,
   Table,
@@ -9,20 +9,59 @@ import {
   Popconfirm,
   Tooltip,
   Grid,
+  message,
 } from "antd"
 import { PlusOutlined, EditOutlined, StopOutlined } from "@ant-design/icons"
-import { useData } from "../context/DataContext"
-import { formatCurrency, formatFecha } from "../utils/helpers"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 import EntradaForm from "../components/EntradaForm"
 
 const { Title } = Typography
 const { useBreakpoint } = Grid
 
+//formatea un número como moneda en pesos mexicanos
+function formatCurrency(valor) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(Number(valor))
+}
+
+//formatea una fecha a formato legible dd/mm/aaaa
+function formatFecha(fecha) {
+  return new Date(fecha).toLocaleDateString("es-MX")
+}
+
 export default function EntradasMercancia() {
-  const { entradas, deshabilitarEntrada } = useData()
+  const [entradas, setEntradas] = useState([])
   const [formOpen, setFormOpen] = useState(false)
   const [entradaEditar, setEntradaEditar] = useState(null)
   const screens = useBreakpoint()
+
+  useEffect(() => {
+    cargarEntradas()
+  }, [])
+
+  //trae las entradas de mercancía desde el backend
+  const cargarEntradas = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/obtenerEntradas`)
+      setEntradas(response.data)
+    } catch (error) {
+      message.error("Error al cargar las entradas de mercancía")
+    }
+  }
+
+  //deshabilita una entrada en el backend y refresca la tabla
+  const deshabilitarEntrada = async (id) => {
+    try {
+      await axios.post(`${BACKEND_URL}/deshabilitarEntrada`, { id })
+      message.success("Entrada deshabilitada correctamente")
+      cargarEntradas()
+    } catch (error) {
+      message.error("Error al deshabilitar la entrada")
+    }
+  }
 
   function nueva() {
     setEntradaEditar(null)
@@ -37,16 +76,16 @@ export default function EntradasMercancia() {
   const columnas = [
     {
       title: "Fecha",
-      dataIndex: "fecha",
-      key: "fecha",
+      dataIndex: "fecha_compra",
+      key: "fecha_compra",
       render: (f) => formatFecha(f),
-      sorter: (a, b) => new Date(b.fecha) - new Date(a.fecha),
+      sorter: (a, b) => new Date(b.fecha_compra) - new Date(a.fecha_compra),
       defaultSortOrder: "ascend",
     },
     {
       title: "Producto",
-      dataIndex: "nombreProducto",
-      key: "producto",
+      dataIndex: "nombre_producto",
+      key: "nombre_producto",
       render: (n) => <strong>{n}</strong>,
     },
     {
@@ -57,24 +96,24 @@ export default function EntradasMercancia() {
     },
     {
       title: "Costo unit.",
-      dataIndex: "costoUnitario",
-      key: "costo",
+      dataIndex: "costo_unitario_compra",
+      key: "costo_unitario_compra",
       align: "right",
       render: (v) => formatCurrency(v),
     },
     {
       title: "Proveedor",
-      dataIndex: "proveedor",
-      key: "proveedor",
+      dataIndex: "nombre_proveedor",
+      key: "nombre_proveedor",
       responsive: ["md"],
       render: (p) => p || <Typography.Text type="secondary">—</Typography.Text>,
     },
     {
       title: "Estado",
-      dataIndex: "estado",
-      key: "estado",
+      dataIndex: "estatus",
+      key: "estatus",
       render: (e) => (
-        <Tag color={e === "Activa" ? "success" : "default"}>{e}</Tag>
+        <Tag color={e === 1 ? "success" : "default"}>{e === 1 ? "Activa" : "Deshabilitada"}</Tag>
       ),
     },
     {
@@ -88,7 +127,7 @@ export default function EntradasMercancia() {
             <Button
               size="small"
               icon={<EditOutlined />}
-              disabled={record.estado === "Deshabilitada"}
+              disabled={record.estatus !== 1}
               onClick={() => editar(record)}
             />
           </Tooltip>
@@ -98,15 +137,15 @@ export default function EntradasMercancia() {
             okText="Sí, deshabilitar"
             cancelText="Cancelar"
             okButtonProps={{ danger: true }}
-            disabled={record.estado === "Deshabilitada"}
-            onConfirm={() => deshabilitarEntrada(record.id)}
+            disabled={record.estatus !== 1}
+            onConfirm={() => deshabilitarEntrada(record.pk_entrada_producto)}
           >
             <Tooltip title="Deshabilitar">
               <Button
                 size="small"
                 danger
                 icon={<StopOutlined />}
-                disabled={record.estado === "Deshabilitada"}
+                disabled={record.estatus !== 1}
               />
             </Tooltip>
           </Popconfirm>
@@ -139,7 +178,7 @@ export default function EntradasMercancia() {
         <Table
           columns={columnas}
           dataSource={entradas}
-          rowKey="id"
+          rowKey="pk_entrada_producto"
           scroll={{ x: 760 }}
           pagination={{ pageSize: 10, showSizeChanger: false }}
         />
@@ -149,6 +188,7 @@ export default function EntradasMercancia() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         entradaEditar={entradaEditar}
+        onGuardado={cargarEntradas}
       />
     </div>
   )

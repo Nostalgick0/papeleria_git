@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Row, Col, Card, Statistic, Segmented, Table, Progress, Typography, Empty, Tag } from "antd"
 import {
   DollarOutlined,
@@ -6,8 +6,8 @@ import {
   ShoppingOutlined,
   WarningOutlined,
 } from "@ant-design/icons"
-import { useData } from "../context/DataContext"
-import { formatCurrency, dentroDelPeriodo } from "../utils/helpers"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 
 const { Title, Text } = Typography
 
@@ -17,22 +17,81 @@ const opcionesPeriodo = [
   { label: "Este mes", value: "mes" },
 ]
 
+//formatea un número como moneda en pesos mexicanos
+function formatCurrency(valor) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(valor)
+}
+
+//revisa si una fecha cae dentro del periodo seleccionado (hoy, semana, mes)
+function dentroDelPeriodo(fecha, periodo) {
+  const fechaVenta = new Date(fecha)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+
+  const fechaSinHora = new Date(fechaVenta)
+  fechaSinHora.setHours(0, 0, 0, 0)
+
+  if (periodo === "hoy") {
+    return fechaSinHora.getTime() === hoy.getTime()
+  }
+
+  if (periodo === "semana") {
+    const inicioSemana = new Date(hoy)
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay())
+    return fechaSinHora.getTime() >= inicioSemana.getTime()
+  }
+
+  if (periodo === "mes") {
+    return (
+      fechaVenta.getFullYear() === hoy.getFullYear() &&
+      fechaVenta.getMonth() === hoy.getMonth()
+    )
+  }
+
+  return true
+}
+
 export default function Dashboard() {
-  const { ventas, productos } = useData()
+  const [ventas, setVentas] = useState([])
+  const [productos, setProductos] = useState([])
+  const [detalle, setDetalle] = useState([])
   const [periodo, setPeriodo] = useState("mes")
+
+  useEffect(() => {
+    cargarDatos()
+  }, [])
+
+  //trae ventas, productos y el detalle de todas las ventas desde el backend
+  const cargarDatos = async () => {
+    try {
+      const [resVentas, resProductos, resDetalle] = await Promise.all([
+        axios.get(`${BACKEND_URL}/obtenerVentas`),
+        axios.get(`${BACKEND_URL}/obtenerProductos`),
+        axios.get(`${BACKEND_URL}/obtenerTodoDetalle`),
+      ])
+      setVentas(resVentas.data)
+      setProductos(resProductos.data)
+      setDetalle(resDetalle.data)
+    } catch (error) {
+      // si falla la carga, el dashboard simplemente se queda vacío
+    }
+  }
 
   // Mapa rápido de costo por producto
   const costoPorProducto = useMemo(() => {
     const m = {}
     productos.forEach((p) => {
-      m[p.id] = p.costoUltimaCompra
+      m[p.pk_producto] = Number(p.costo_compra)
     })
     return m
   }, [productos])
 
   const { ingresos, ganancias, numVentas, ranking } = useMemo(() => {
     const ventasPeriodo = ventas.filter(
-      (v) => v.estado === "Activa" && dentroDelPeriodo(v.fecha, periodo),
+      (v) => v.estatus === 1 && dentroDelPeriodo(v.fecha_venta, periodo),
     )
 
     let ingresosTot = 0
@@ -40,27 +99,36 @@ export default function Dashboard() {
     const conteoProductos = {}
 
     ventasPeriodo.forEach((venta) => {
-      ingresosTot += venta.total
+      ingresosTot += Number(venta.total_venta)
+
+      const itemsVenta = detalle.filter(
+        (d) => d.fk_venta === venta.pk_venta && d.fk_producto,
+      )
+      const serviciosVenta = detalle.filter(
+        (d) => d.fk_venta === venta.pk_venta && d.fk_servicio,
+      )
 
       // Ganancia por productos: (precioVenta - costoUltimaCompra) * cantidad
-      venta.items.forEach((item) => {
-        const costo = costoPorProducto[item.productoId] ?? 0
-        gananciasTot += (item.precioUnitario - costo) * item.cantidad
+      itemsVenta.forEach((item) => {
+        const costo = costoPorProducto[item.fk_producto] ?? 0
+        const precio = Number(item.precio_unidad_prod)
+        const cantidad = Number(item.cantidad_unidad)
+        gananciasTot += (precio - costo) * cantidad
 
-        if (!conteoProductos[item.productoId]) {
-          conteoProductos[item.productoId] = {
-            nombre: item.nombre,
+        if (!conteoProductos[item.fk_producto]) {
+          conteoProductos[item.fk_producto] = {
+            nombre: item.nombre_producto,
             cantidad: 0,
             ingreso: 0,
           }
         }
-        conteoProductos[item.productoId].cantidad += item.cantidad
-        conteoProductos[item.productoId].ingreso += item.subtotal
+        conteoProductos[item.fk_producto].cantidad += cantidad
+        conteoProductos[item.fk_producto].ingreso += Number(item.subtotal)
       })
 
       // Ganancia por servicios: todo el subtotal es ganancia
-      ;(venta.servicios || []).forEach((srv) => {
-        gananciasTot += srv.subtotal
+      serviciosVenta.forEach((srv) => {
+        gananciasTot += Number(srv.subtotal)
       })
     })
 
@@ -74,12 +142,12 @@ export default function Dashboard() {
       numVentas: ventasPeriodo.length,
       ranking: rankingArr,
     }
-  }, [ventas, periodo, costoPorProducto])
+  }, [ventas, detalle, periodo, costoPorProducto])
 
   const maxCantidad = ranking.length > 0 ? ranking[0].cantidad : 0
 
   const stockBajo = productos.filter(
-    (p) => p.estado === "Activo" && p.stockActual < p.stockMinimo,
+    (p) => p.estatus === 1 && Number(p.stock) < Number(p.stock_minimo),
   )
 
   const columnas = [
@@ -206,7 +274,7 @@ export default function Dashboard() {
             ) : (
               stockBajo.map((p) => (
                 <div
-                  key={p.id}
+                  key={p.pk_producto}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -215,9 +283,9 @@ export default function Dashboard() {
                     borderBottom: "1px solid #f0f0f0",
                   }}
                 >
-                  <Text>{p.nombre}</Text>
+                  <Text>{p.nombre_producto}</Text>
                   <Tag color="error">
-                    {p.stockActual} / {p.stockMinimo}
+                    {p.stock} / {p.stock_minimo}
                   </Tag>
                 </div>
               ))

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Layout, Menu, Button, Drawer, Grid, Dropdown, Badge, Typography, Space } from "antd"
 import {
   DashboardOutlined,
@@ -13,8 +13,8 @@ import {
   WarningOutlined,
 } from "@ant-design/icons"
 import { useNavigate, useLocation, Outlet } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
-import { useData } from "../context/DataContext"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 
 const { Header, Sider, Content } = Layout
 const { useBreakpoint } = Grid
@@ -31,16 +31,32 @@ const menuItems = [
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [productos, setProductos] = useState([])
   const navigate = useNavigate()
   const location = useLocation()
-  const { usuario, logout } = useAuth()
-  const { productos } = useData()
   const screens = useBreakpoint()
 
   const esMovil = !screens.md
 
+  //el usuario logueado se guarda directo en localStorage al iniciar sesión
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+
+  useEffect(() => {
+    cargarProductos()
+  }, [])
+
+  //trae los productos para poder calcular el stock bajo en la alerta
+  const cargarProductos = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/obtenerProductos`)
+      setProductos(response.data)
+    } catch (error) {
+      setProductos([])
+    }
+  }
+
   const stockBajo = productos.filter(
-    (p) => p.estado === "Activo" && p.stockActual < p.stockMinimo,
+    (p) => p.estatus === 1 && Number(p.stock) < Number(p.stock_minimo),
   ).length
 
   function irA(key) {
@@ -49,7 +65,7 @@ export default function MainLayout() {
   }
 
   function handleLogout() {
-    logout()
+    localStorage.removeItem("usuario")
     navigate("/login")
   }
 
@@ -160,7 +176,7 @@ export default function MainLayout() {
             <Button type="text" style={{ height: "auto", padding: "4px 8px" }}>
               <Space>
                 <UserOutlined />
-                <span>{usuario?.nombre || "Administrador"}</span>
+                <span>{usuario?.nombre_usuario || "Administrador"}</span>
               </Space>
             </Button>
           </Dropdown>

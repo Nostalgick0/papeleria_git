@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Card,
   Table,
@@ -13,6 +13,7 @@ import {
   Row,
   Col,
   Grid,
+  message,
 } from "antd"
 import {
   PlusOutlined,
@@ -21,20 +22,61 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
 } from "@ant-design/icons"
-import { useData } from "../context/DataContext"
-import { formatCurrency } from "../utils/helpers"
+import axios from "axios"
+import { BACKEND_URL } from "../Backend"
 import ProductoForm from "../components/ProductoForm"
 
 const { Title, Text } = Typography
 const { useBreakpoint } = Grid
 
+//formatea un número como moneda en pesos mexicanos
+function formatCurrency(valor) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(valor)
+}
+
 export default function Inventario() {
-  const { productos, categorias, cambiarEstadoProducto } = useData()
+  const [productos, setProductos] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [formOpen, setFormOpen] = useState(false)
   const [productoEditar, setProductoEditar] = useState(null)
   const [busqueda, setBusqueda] = useState("")
   const [filtroCategoria, setFiltroCategoria] = useState(null)
   const screens = useBreakpoint()
+
+  useEffect(() => {
+    cargarDatos()
+  }, [])
+
+  //trae productos y categorías desde el backend
+  const cargarDatos = async () => {
+    try {
+      const [resProductos, resCategorias] = await Promise.all([
+        axios.get(`${BACKEND_URL}/obtenerProductos`),
+        axios.get(`${BACKEND_URL}/obtenerCategorias`),
+      ])
+      setProductos(resProductos.data)
+      setCategorias(resCategorias.data)
+    } catch (error) {
+      message.error("Error al cargar el inventario")
+    }
+  }
+
+  //activa o desactiva un producto y refresca la tabla
+  const cambiarEstadoProducto = async (pk_producto, estatus) => {
+    try {
+      await axios.post(`${BACKEND_URL}/cambiarEstadoProducto`, {
+        pk_producto,
+        estatus,
+      })
+      message.success("Estado del producto actualizado correctamente")
+      cargarDatos()
+    } catch (error) {
+      message.error("Error al actualizar el estado del producto")
+    }
+  }
 
   function nuevo() {
     setProductoEditar(null)
@@ -46,12 +88,21 @@ export default function Inventario() {
     setFormOpen(true)
   }
 
+  //mapa rápido de pk_categoria -> nombre_categoria para mostrarlo en la tabla
+  const nombreCategoria = useMemo(() => {
+    const m = {}
+    categorias.forEach((c) => {
+      m[c.pk_categoria] = c.nombre_categoria
+    })
+    return m
+  }, [categorias])
+
   const productosFiltrados = useMemo(() => {
     return productos.filter((p) => {
-      const coincideNombre = p.nombre
+      const coincideNombre = p.nombre_producto
         .toLowerCase()
         .includes(busqueda.toLowerCase())
-      const coincideCategoria = !filtroCategoria || p.categoria === filtroCategoria
+      const coincideCategoria = !filtroCategoria || p.fk_categoria === filtroCategoria
       return coincideNombre && coincideCategoria
     })
   }, [productos, busqueda, filtroCategoria])
@@ -59,13 +110,13 @@ export default function Inventario() {
   const columnas = [
     {
       title: "Producto",
-      dataIndex: "nombre",
-      key: "nombre",
+      dataIndex: "nombre_producto",
+      key: "nombre_producto",
       render: (nombre, record) => (
         <Space direction="vertical" size={0}>
           <Text strong>{nombre}</Text>
-          {record.estado === "Activo" &&
-            record.stockActual < record.stockMinimo && (
+          {record.estatus === 1 &&
+            Number(record.stock) < Number(record.stock_minimo) && (
               <Tag color="error" icon={<WarningOutlined />} style={{ marginTop: 4 }}>
                 Stock bajo
               </Tag>
@@ -75,22 +126,22 @@ export default function Inventario() {
     },
     {
       title: "Categoría",
-      dataIndex: "categoria",
-      key: "categoria",
+      dataIndex: "fk_categoria",
+      key: "fk_categoria",
       responsive: ["sm"],
-      render: (c) => <Tag>{c}</Tag>,
+      render: (c) => <Tag>{nombreCategoria[c] || "Sin categoría"}</Tag>,
     },
     {
       title: "Precio venta",
-      dataIndex: "precioVenta",
-      key: "precioVenta",
+      dataIndex: "precio_venta",
+      key: "precio_venta",
       align: "right",
       render: (v) => formatCurrency(v),
     },
     {
       title: "Costo compra",
-      dataIndex: "costoUltimaCompra",
-      key: "costo",
+      dataIndex: "costo_compra",
+      key: "costo_compra",
       align: "right",
       responsive: ["md"],
       render: (v) => formatCurrency(v),
@@ -101,27 +152,27 @@ export default function Inventario() {
       align: "center",
       render: (_, record) => {
         const bajo =
-          record.estado === "Activo" && record.stockActual < record.stockMinimo
+          record.estatus === 1 && Number(record.stock) < Number(record.stock_minimo)
         return (
           <Text type={bajo ? "danger" : undefined} strong={bajo}>
-            {record.stockActual}
+            {record.stock}
           </Text>
         )
       },
     },
     {
       title: "Stock mín.",
-      dataIndex: "stockMinimo",
-      key: "stockMinimo",
+      dataIndex: "stock_minimo",
+      key: "stock_minimo",
       align: "center",
       responsive: ["md"],
     },
     {
       title: "Estado",
-      dataIndex: "estado",
-      key: "estado",
+      dataIndex: "estatus",
+      key: "estatus",
       render: (e) => (
-        <Tag color={e === "Activo" ? "success" : "default"}>{e}</Tag>
+        <Tag color={e === 1 ? "success" : "default"}>{e === 1 ? "Activo" : "Inactivo"}</Tag>
       ),
     },
     {
@@ -138,14 +189,14 @@ export default function Inventario() {
               onClick={() => editar(record)}
             />
           </Tooltip>
-          {record.estado === "Activo" ? (
+          {record.estatus === 1 ? (
             <Popconfirm
               title="¿Desactivar este producto?"
               description="No se eliminará; se conservará el historial. Podrás reactivarlo después."
               okText="Sí, desactivar"
               cancelText="Cancelar"
               okButtonProps={{ danger: true }}
-              onConfirm={() => cambiarEstadoProducto(record.id, "Inactivo")}
+              onConfirm={() => cambiarEstadoProducto(record.pk_producto, 0)}
             >
               <Tooltip title="Desactivar">
                 <Button size="small" danger icon={<StopOutlined />} />
@@ -156,7 +207,7 @@ export default function Inventario() {
               <Button
                 size="small"
                 icon={<CheckCircleOutlined />}
-                onClick={() => cambiarEstadoProducto(record.id, "Activo")}
+                onClick={() => cambiarEstadoProducto(record.pk_producto, 1)}
               />
             </Tooltip>
           )}
@@ -202,7 +253,10 @@ export default function Inventario() {
               style={{ width: "100%" }}
               value={filtroCategoria}
               onChange={setFiltroCategoria}
-              options={categorias.map((c) => ({ value: c, label: c }))}
+              options={categorias.map((c) => ({
+                value: c.pk_categoria,
+                label: c.nombre_categoria,
+              }))}
             />
           </Col>
         </Row>
@@ -212,7 +266,7 @@ export default function Inventario() {
         <Table
           columns={columnas}
           dataSource={productosFiltrados}
-          rowKey="id"
+          rowKey="pk_producto"
           scroll={{ x: 760 }}
           pagination={{ pageSize: 10, showSizeChanger: false }}
         />
@@ -222,6 +276,7 @@ export default function Inventario() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         productoEditar={productoEditar}
+        onGuardado={cargarDatos}
       />
     </div>
   )

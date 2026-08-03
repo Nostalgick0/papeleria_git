@@ -132,7 +132,21 @@ async function getEmpresas() {
 //°---------------------------------°
 
 async function getProveedores() {
-    const [rows] = await db.query('SELECT pk_proveedor, nombre_proveedor, fk_empresa, RFC, telefono, correo, estatus from proveedores');
+    const [rows] = await db.query(
+        'SELECT pr.pk_proveedor, pr.nombre_proveedor, pr.fk_empresa, e.nombre_empresa, \
+                pr.RFC, pr.telefono, pr.correo, pr.estatus \
+        FROM proveedores pr \
+        LEFT JOIN empresas e ON pr.fk_empresa = e.pk_empresa'
+    );
+
+    return rows;
+}
+
+async function cambiarEstadoProveedor(pk_proveedor, estatus) {
+    const [rows] = await db.query(
+        'UPDATE proveedores SET estatus = ? WHERE pk_proveedor = ?',
+        [estatus, pk_proveedor]
+    );
 
     return rows;
 }
@@ -153,6 +167,15 @@ async function getProductos() {
     return rows;
 }
 
+async function cambiarEstadoProducto(pk_producto, estatus) {
+    const [rows] = await db.query(
+        'UPDATE productos SET estatus = ? WHERE pk_producto = ?',
+        [estatus, pk_producto]
+    );
+
+    return rows;
+}
+
 //---------------------------------------------------------------------------------------------------
 
 //°---------------------------------°
@@ -164,9 +187,49 @@ async function getProductos() {
 //°---------------------------------°
 
 async function getEntradas() {
-    const [rows] = await db.query('SELECT pk_entrada_producto, fecha_compra, total, fk_producto, cantidad, costo_unitario_compra, fk_proveedor, estatus from entradas_productos');
+    const [rows] = await db.query(
+        'SELECT e.pk_entrada_producto, e.fecha_compra, e.total, \
+                e.fk_producto, p.nombre_producto, e.cantidad, e.costo_unitario_compra, \
+                e.fk_proveedor, prov.nombre_proveedor, e.estatus \
+        FROM entradas_productos e \
+        LEFT JOIN productos p ON e.fk_producto = p.pk_producto \
+        LEFT JOIN proveedores prov ON e.fk_proveedor = prov.pk_proveedor'
+    );
 
     return rows;
+}
+
+async function deshabilitarEntrada(pk_entrada_producto) {
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        //se resta del stock la cantidad que esta entrada había sumado
+        const [filas] = await connection.query(
+            'SELECT fk_producto, cantidad FROM entradas_productos WHERE pk_entrada_producto = ?',
+            [pk_entrada_producto]
+        );
+        if (filas.length > 0) {
+            const { fk_producto, cantidad } = filas[0];
+            await connection.query(
+                'UPDATE productos SET stock = stock - ? WHERE pk_producto = ?',
+                [cantidad, fk_producto]
+            );
+        }
+
+        const [resultado] = await connection.query(
+            'UPDATE entradas_productos SET estatus = 0 WHERE pk_entrada_producto = ?',
+            [pk_entrada_producto]
+        );
+
+        await connection.commit();
+        return resultado;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 }
 
 //---------------------------------------------------------------------------------------------------
@@ -366,6 +429,19 @@ async function getDetalle(fk_venta) {
     return rows;
 }
 
+async function getTodoDetalle() {
+    const [rows] = await db.query(
+        'SELECT d.pk_detalle_com, d.fk_venta, \
+                d.fk_producto, p.nombre_producto, d.precio_unidad_prod, d.cantidad_unidad, \
+                d.fk_servicio, s.nombre_servicio, d.cantidad_servicio, d.precio_unidad_serv, \
+                d.subtotal, d.estatus \
+        FROM detalle_venta d \
+        LEFT JOIN productos p ON d.fk_producto = p.pk_producto \
+        LEFT JOIN servicios s ON d.fk_servicio = s.pk_servicio'
+    );
+
+    return rows;
+}
 //---------------------------------------------------------------------------------------------------
 
 //exportamos las funciones para poder utilizarlas
@@ -383,6 +459,10 @@ module.exports = {
     getServicios,
     getUnidades,
     getVentas,
+    getTodoDetalle,
     insertUnidad,
-    insertVenta
+    insertVenta,
+    cambiarEstadoProducto, 
+    deshabilitarEntrada,
+    cambiarEstadoProveedor
 };
