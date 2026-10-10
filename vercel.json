@@ -4,12 +4,12 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "installCommand": "pnpm install"
+      "installCommand": "npm install"
     },
     "frontend": {
       "root": "frontend",
       "framework": "vite",
-      "installCommand": "pnpm install"
+      "installCommand": "npm install"
     }
   },
   "rewrites": [
