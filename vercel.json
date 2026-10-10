@@ -3,11 +3,13 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "express"
+      "framework": "express",
+      "installCommand": "pnpm install --no-frozen-lockfile"
     },
     "frontend": {
       "root": "frontend",
-      "framework": "vite"
+      "framework": "vite",
+      "installCommand": "pnpm install --no-frozen-lockfile"
     }
   },
   "rewrites": [
