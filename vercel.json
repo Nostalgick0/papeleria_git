@@ -4,12 +4,12 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "installCommand": "pnpm install --no-frozen-lockfile"
+      "installCommand": "pnpm install"
     },
     "frontend": {
       "root": "frontend",
       "framework": "vite",
-      "installCommand": "pnpm install --no-frozen-lockfile"
+      "installCommand": "pnpm install"
     }
   },
   "rewrites": [
